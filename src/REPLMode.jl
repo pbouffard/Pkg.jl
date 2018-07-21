@@ -59,7 +59,8 @@ end
 # Options #
 ###########
 @enum(OptionKind, OPT_ENV, OPT_PROJECT, OPT_MANIFEST, OPT_MAJOR, OPT_MINOR,
-                  OPT_PATCH, OPT_FIXED, OPT_COVERAGE, OPT_NAME)
+                  OPT_PATCH, OPT_FIXED, OPT_COVERAGE, OPT_NAME,
+                  OPT_LOCAL, OPT_SHARED)
 
 function Types.PackageMode(opt::OptionKind)
     opt == OPT_MANIFEST && return PKGMODE_MANIFEST
@@ -105,7 +106,13 @@ const opts = Dict(
     "fixed"    => OPT_FIXED,
     "coverage" => OPT_COVERAGE,
     "name"     => OPT_NAME,
+    "local"    => OPT_LOCAL,
+    "l"        => OPT_LOCAL,
+    "shared"   => OPT_SHARED,
+    "s"        => OPT_SHARED,
 )
+
+devmode() = get(ENV, "JULIA_PKG_DEVMODE", "shared") == "shared" ? OPT_SHARED : OPT_LOCAL
 
 function parse_option(word::AbstractString)::Option
     m = match(r"^(?: -([a-z]) | --([a-z]{2,})(?:\s*=\s*(\S*))? )$"ix, word)
@@ -638,6 +645,7 @@ function do_add_or_develop!(ctx::Context, tokens::Vector{Token}, cmd::CommandKin
     isempty(tokens) &&
         cmderror("`$mode` – list packages to $mode")
     pkgs = PackageSpec[]
+    dev_mode = devmode()
     while !isempty(tokens)
         token = popfirst!(tokens)
         if token isa String
@@ -654,10 +662,15 @@ function do_add_or_develop!(ctx::Context, tokens::Vector{Token}, cmd::CommandKin
                 pkgs[end].repo.rev = token.rev
             end
         elseif token isa Option
-            cmderror("`$mode` doesn't take options: $token")
+            if mode === :develop && token.kind in (OPT_LOCAL, OPT_SHARED)
+                dev_mode = token.kind
+            else
+                cmderror("`$mode` doesn't take options: $token")
+            end
         end
     end
-    return API.add_or_develop(ctx, pkgs, mode=mode)
+    dev_dir = dev_mode == OPT_LOCAL ? joinpath(dirname(ctx.env.project_file), "dev") : devdir()
+    return API.add_or_develop(ctx, pkgs, mode=mode, devdir=dev_dir)
 end
 
 function do_up!(ctx::Context, tokens::Vector{Token})

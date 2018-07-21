@@ -21,7 +21,7 @@ add_or_develop(pkg::Union{String, PackageSpec}; kwargs...) = add_or_develop([pkg
 add_or_develop(pkgs::Vector{String}; kwargs...)            = add_or_develop([parse_package(pkg) for pkg in pkgs]; kwargs...)
 add_or_develop(pkgs::Vector{PackageSpec}; kwargs...)       = add_or_develop(Context(), pkgs; kwargs...)
 
-function add_or_develop(ctx::Context, pkgs::Vector{PackageSpec}; mode::Symbol, kwargs...)
+function add_or_develop(ctx::Context, pkgs::Vector{PackageSpec}; mode::Symbol, devdir::String=devdir(), kwargs...)
     print_first_command_header()
     Context!(ctx; kwargs...)
 
@@ -35,7 +35,7 @@ function add_or_develop(ctx::Context, pkgs::Vector{PackageSpec}; mode::Symbol, k
         update_registry(ctx)
     end
     if mode == :develop
-        new_git = handle_repos_develop!(ctx, pkgs)
+        new_git = handle_repos_develop!(ctx, pkgs, devdir)
     else
         new_git = handle_repos_add!(ctx, pkgs; upgrade_or_add=true)
     end
