@@ -324,7 +324,6 @@ function do_cmd!(tokens::Vector{Token}, repl)
             cmderror("misplaced token: ", token)
         end
     end
-    cmd.kind == CMD_ACTIVATE && return Base.invokelatest(do_activate!, tokens)
 
     ctx = Context(env = EnvCache(env_opt))
     if cmd.kind == CMD_PREVIEW
@@ -337,6 +336,7 @@ function do_cmd!(tokens::Vector{Token}, repl)
 
     # Using invokelatest to hide the functions from inference.
     # Otherwise it would try to infer everything here.
+    cmd.kind == CMD_ACTIVATE    ? Base.invokelatest(      do_activate!, ctx, tokens) :
     cmd.kind == CMD_INIT        ? Base.invokelatest(          do_init!, ctx, tokens) :
     cmd.kind == CMD_HELP        ? Base.invokelatest(          do_help!, ctx, tokens, repl) :
     cmd.kind == CMD_RM          ? Base.invokelatest(            do_rm!, ctx, tokens) :
@@ -816,15 +816,27 @@ function do_resolve!(ctx::Context, tokens::Vector{Token})
     API.resolve(ctx)
 end
 
-function do_activate!(tokens::Vector{Token})
+function do_activate!(ctx::Context, tokens::Vector{Token})
     if isempty(tokens)
         return API.activate()
     else
-        token = popfirst!(tokens)
-        if !isempty(tokens) || !(token isa String)
+        path = popfirst!(tokens)
+        if !isempty(tokens) || !(path isa String)
             cmderror("`activate` takes an optional path to the env to activate")
         end
-        return API.activate(abspath(token))
+        # `pkg> activate path` does the following
+        # 1. if path exists, activate that
+        # 2. if path exists in deps, and the dep is deved, activate that path
+        # 3. activate the non-existing directory (e.g. as in `pkg> activate .` for initing a new env)
+        if Types.isdir_windows_workaround(path)
+            API.activate(abspath(path))
+        elseif haskey(ctx.env.project, "deps") && haskey(ctx.env.project["deps"], path) &&
+            haskey(ctx.env.manifest, path) && haskey(ctx.env.manifest[path][1], "path") &&
+            ctx.env.manifest[path][1]["path"] != nothing
+            API.activate(abspath(ctx.env.manifest[path][1]["path"]))
+        else
+            API.activate(abspath(path))
+        end
     end
 end
 
