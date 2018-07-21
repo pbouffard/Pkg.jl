@@ -404,6 +404,4 @@ temp_pkg_dir() do project_path
     end
 end
 
-include("repl.jl")
-
 end # module

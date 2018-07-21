@@ -229,6 +229,10 @@ temp_pkg_dir() do project_path; cd(project_path) do
                         pkg"develop ../SubModule2"
                         @test Pkg.installed()["SubModule1"] == v"0.1.0"
                         @test Pkg.installed()["SubModule2"] == v"0.1.0"
+                        # make sure paths to SubModule1 and SubModule2 are relative
+                        manifest = Pkg.Context().env.manifest
+                        @test manifest["SubModule1"][1]["path"] == "SubModule1"
+                        @test manifest["SubModule2"][1]["path"] == "SubModule2"
                     end
                 end
                 cp("HelloWorld", joinpath(other_dir, "HelloWorld"))
@@ -244,6 +248,24 @@ temp_pkg_dir() do project_path; cd(project_path) do
     end
 end # cd
 end # temp_pkg_dir
+
+# test relative dev paths (#490)
+cd(mktempdir()) do
+    withenv("USER" => "Test User") do
+        pkg"generate HelloWorld"
+        cd("HelloWorld")
+        pkg"generate SubModule"
+        cd(mkdir("tests"))
+        pkg"activate ."
+        pkg"develop .." # HelloWorld
+        pkg"develop ../SubModule"
+        @test Pkg.installed()["HelloWorld"] == v"0.1.0"
+        @test Pkg.installed()["SubModule"] == v"0.1.0"
+        manifest = Pkg.Context().env.manifest
+        @test manifest["HelloWorld"][1]["path"] == ".."
+        @test manifest["SubModule"][1]["path"] == joinpath("..", "SubModule")
+    end
+end
 
 
 test_complete(s) = Pkg.REPLMode.completions(s,lastindex(s))

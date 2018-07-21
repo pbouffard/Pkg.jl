@@ -442,7 +442,14 @@ function handle_repos_develop!(ctx::Context, pkgs::AbstractVector{PackageSpec})
 
             if isdir_windows_workaround(pkg.repo.url)
                 # Developing a local package, just point `pkg.path` to it
-                pkg.path = abspath(pkg.repo.url)
+                if isabspath(pkg.repo.url)
+                    # absolute paths should stay absolute
+                    pkg.path = pkg.repo.url
+                else
+                    # relative paths are given relative pwd() so we
+                    # translate that to be relative the project instead
+                    pkg.path = relpath(abspath(pkg.repo.url), dirname(ctx.env.project_file))
+                end
                 folder_already_downloaded = true
                 project_path = pkg.repo.url
                 parse_package!(ctx, pkg, project_path)

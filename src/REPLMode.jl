@@ -130,7 +130,7 @@ end
 function parse_package(word::AbstractString; add_or_develop=false)::PackageSpec
     word = replace(word, "~" => homedir())
     if add_or_develop && casesensitive_isdir(word)
-        return PackageSpec(Types.GitRepo(abspath(word)))
+        return PackageSpec(Types.GitRepo(word))
     elseif occursin(uuid_re, word)
         return PackageSpec(UUID(word))
     elseif occursin(name_re, word)
