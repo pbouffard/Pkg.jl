@@ -193,6 +193,9 @@ Since we haven't created our own project yet, we are in the default project, loc
 
 To return to the `julia>` prompt, either press backspace when the input line is empty or press Ctrl+C.
 Help is available by calling `pkg> help`.
+If you are in an environment that does not have access to a REPL you can still use the REPL mode commands using
+the string macro `pkg` avaiable after `using Pkg`. The command `pkg"cmd"` would be equivalent to executing `cmd`
+in the REPL mode.
 
 The documentation here describes using Pkg from the REPL mode. Documentation of using
 the Pkg API (by calling `Pkg.` functions) is in progress of being written.
@@ -826,3 +829,24 @@ Simply clone their project using e.g. `git clone`, `cd` to the project directory
 
 If the project contains a manifest, this will install the packages in the same state that is given by that manifest.
 Otherwise, it will resolve the latest versions of the dependencies compatible with the project.
+
+## References
+
+This section describes the "API mode" of interacting with Pkg.jl which is recommended for non-interactive usage,
+in i.e. scripts. In the REPL mode packages (with associated versions, uuids, urls etc) are parsed from strings, 
+for example `"Package#master"`,`"Package@v0.1"`, `"www.mypkg.com/MyPkg#my/feature"`. 
+It is possible to use strings as arguments for simple commands in the API mode (like `Pkg.add(["PackageA", "PackageB"])`
+, more complicated commands, that e.g. specify urls or version range, requires a more structured format.
+This is done by creating an instance of a [`PackageSpec`](@ref) which are passed in to functions.
+
+```@docs
+PackageSpec
+```
+
+
+
+
+
+```@docs
+Pkg.add
+```

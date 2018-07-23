@@ -15,15 +15,25 @@ preview_info() = printstyled("───── Preview mode ─────\n"; c
 
 include("generate.jl")
 
-parse_package(pkg) = Pkg.REPLMode.parse_package(pkg; add_or_develop=true)
+function check_package_name(x::String)
+    if !(occursin(x, REPLMode.name_re))
+         cmderror("$x is not a valid packagename")
+    end
+    return PackageSpec(x)
+end
 
 add_or_develop(pkg::Union{String, PackageSpec}; kwargs...) = add_or_develop([pkg]; kwargs...)
-add_or_develop(pkgs::Vector{String}; kwargs...)            = add_or_develop([parse_package(pkg) for pkg in pkgs]; kwargs...)
+add_or_develop(pkgs::Vector{String}; kwargs...)            = add_or_develop([check_package_name(pkg) for pkg in pkgs]; kwargs...)
 add_or_develop(pkgs::Vector{PackageSpec}; kwargs...)       = add_or_develop(Context(), pkgs; kwargs...)
 
-function add_or_develop(ctx::Context, pkgs::Vector{PackageSpec}; mode::Symbol, kwargs...)
+function add_or_develop(ctx::Context, pkgs::Vector{PackageSpec}; mode::Symbol)
     print_first_command_header()
     Context!(ctx; kwargs...)
+
+    # All developed packages should go through handle_repos_develop so just give them an empty repo
+    for pkg in pkgs
+        mode == :develop && pkg.repo == nothing && (pkg.repo = Types.GitRepo())
+    end
 
     # if julia is passed as a package the solver gets tricked;
     # this catches the error early on
@@ -57,9 +67,9 @@ develop(args...; kwargs...) = add_or_develop(args...; mode = :develop, kwargs...
 @deprecate checkout develop
 
 
-rm(pkg::Union{String, PackageSpec}; kwargs...)               = rm([pkg]; kwargs...)
-rm(pkgs::Vector{String}; kwargs...)      = rm([PackageSpec(pkg) for pkg in pkgs]; kwargs...)
-rm(pkgs::Vector{PackageSpec}; kwargs...) = rm(Context(), pkgs; kwargs...)
+rm(pkg::Union{String, PackageSpec}; kwargs...) = rm([pkg]; kwargs...)
+rm(pkgs::Vector{String}; kwargs...)            = rm([PackageSpec(pkg) for pkg in pkgs]; kwargs...)
+rm(pkgs::Vector{PackageSpec}; kwargs...)       = rm(Context(), pkgs; kwargs...)
 
 function rm(ctx::Context, pkgs::Vector{PackageSpec}; kwargs...)
     print_first_command_header()
@@ -558,12 +568,6 @@ function activate(path::Union{String,Nothing}=nothing)
     Base.ACTIVE_PROJECT[] = Base.load_path_expand(path)
 end
 
-"""
-    setprotocol!(proto::Union{Nothing, AbstractString}=nothing)
-
-Set the protocol used to access GitHub-hosted packages when `add`ing a url or `develop`ing a package.
-Defaults to 'https', with `proto == nothing` delegating the choice to the package developer.
-"""
 setprotocol!(proto::Union{Nothing, AbstractString}=nothing) = GitTools.setprotocol!(proto)
 
 end # module

@@ -1,4 +1,5 @@
-using Documenter, Pkg
+Base.ACTIVE_PROJECT[] = joinpath(@__DIR__, "..")
+using Documenter
 
 makedocs(
     modules = [Pkg],

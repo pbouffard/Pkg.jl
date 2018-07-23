@@ -40,8 +40,21 @@ include("API.jl")
 include("REPLMode.jl")
 
 # Define new variables so tab comleting Pkg. works.
+"""
+    Pkg.add(package::String)
+    Pkg.add(package::PackageSpec)
+
+Adds a package to the current project. 
+"""
 const add          = API.add
+
 const rm           = API.rm
+
+"""
+    Pkg.rm(package::String; )
+    Pkg.rm(package::PackageSpec; )
+
+"""
 const up           = API.up
 const test         = API.test
 const gc           = API.gc
@@ -57,13 +70,43 @@ const resolve      = API.resolve
 const status       = Display.status
 const update       = up
 const activate     = API.activate
+
+"""
+    PackageSpec(name::String, [uuid::UUID, version::VersionNumber])
+    PacakgeSpec(; name, url, rev
+
+A `PackageSpec` is a representation of how t
+This includes:
+    * The `name`
+    * A `uuid`
+    * A `version` range (for example when adding a package.
+    * A path or alternatively a url and optional git revision
+
+Most functions in Pkg take a `Vector` of `PackageSpec` and do the operation on all the packages
+in the vector.
+
+Below is a comparison between the REPL version and the `PackageSpec` version:
+
+
+
+"""
+const PackageSpec  = Types.PackageSpec
+
+"""
+    setprotocol!(proto::Union{Nothing, AbstractString}=nothing)
+
+Set the protocol used to access GitHub-hosted packages when `add`ing a url or `develop`ing a package.
+Defaults to 'https', with `proto == nothing` delegating the choice to the package developer.
+"""
 const setprotocol! = API.setprotocol!
+
+
 
 # legacy CI script support
 import .API: clone, dir
 
 import .REPLMode: @pkg_str
-export @pkg_str
+export @pkg_str, PackageSpec
 
 
 #function __init__()
@@ -79,17 +122,19 @@ export @pkg_str
     end
 #end
 
-using .Types
-using UUIDs
-import LibGit2
-import Dates
-# This crashes low memory systems and some of Julia's CI
-# so keep it disabled by default for now.
-if haskey(ENV, "JULIA_PKG3_PRECOMPILE")
-    const PKG3_IS_PRECOMPILED = true
-    include("precompile.jl")
-else
-    const PKG3_IS_PRECOMPILED = false
+module PrecompileArea
+    using ..Types
+    using UUIDs
+    import LibGit2
+    import Dates
+    # This crashes low memory systems and some of Julia's CI
+    # so keep it disabled by default for now.
+    if haskey(ENV, "JULIA_PKG3_PRECOMPILE")
+        const PKG3_IS_PRECOMPILED = true
+        include("precompile.jl")
+    else
+        const PKG3_IS_PRECOMPILED = false
+    end
 end
 
 METADATA_compatible_uuid(pkg::String) = Types.uuid5(Types.uuid_package, pkg)

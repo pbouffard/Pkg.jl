@@ -138,6 +138,7 @@ end
 
 const VersionTypes = Union{VersionNumber,VersionSpec,UpgradeLevel}
 
+# The url field can also be a local path, rename?
 mutable struct GitRepo
     url::String
     rev::String
@@ -146,6 +147,8 @@ end
 
 GitRepo(url::String, revspec) = GitRepo(url, revspec, nothing)
 GitRepo(url::String) = GitRepo(url, "", nothing)
+GitRepo(;url::Union{String, Nothing}=nothing, rev::Union{String, Nothing} =nothing) =
+    GitRepo(url == nothing ? "" : url, rev == nothing ? "" : rev, nothing)
 Base.:(==)(repo1::GitRepo, repo2::GitRepo) = (repo1.url == repo2.url && repo1.rev == repo2.rev && repo1.git_tree_sha1 == repo2.git_tree_sha1)
 
 mutable struct PackageSpec
@@ -156,12 +159,11 @@ mutable struct PackageSpec
     path::Union{Nothing,String}
     special_action::PackageSpecialAction # If the package is currently being pinned, freed etc
     repo::Union{Nothing,GitRepo}
-    PackageSpec() = new("", UUID(zero(UInt128)), VersionSpec(), PKGMODE_PROJECT, nothing, PKGSPEC_NOTHING, nothing)
-    PackageSpec(name::AbstractString, uuid::UUID, version::VersionTypes,
-                mode::PackageMode=PKGMODE_PROJECT, path=nothing, special_action=PKGSPEC_NOTHING,
-                repo=nothing) =
-        new(String(name), uuid, version, mode, path, special_action, repo)
 end
+PackageSpec() = PackageSpec("", UUID(zero(UInt128)), VersionSpec(), PKGMODE_PROJECT, nothing, PKGSPEC_NOTHING, nothing)
+PackageSpec(name::AbstractString, uuid::UUID, version::VersionTypes,
+            mode::PackageMode=PKGMODE_PROJECT, path=nothing, special_action=PKGSPEC_NOTHING,
+            repo=nothing) = PackageSpec(String(name), uuid, version, mode, path, special_action, repo)
 PackageSpec(name::AbstractString, uuid::UUID) =
     PackageSpec(name, uuid, VersionSpec())
 PackageSpec(name::AbstractString, version::VersionTypes=VersionSpec()) =
@@ -174,18 +176,50 @@ function PackageSpec(repo::GitRepo)
     return pkg
 end
 
+# kwarg constructor
+function PackageSpec(;name::AbstractString="", uuid::Union{String, UUID}=UUID(0), version::String = "*",
+            url = nothing, path = nothing, rev = nothing)
+    if url !== nothing && path !== nothing
+        cmderror("cannot specify `url` and `path` kwargs at the same time")
+    end
+
+    if path !== nothing
+        if rev !== nothing
+            cmderror("cannot specify `path` and `rev` kwargs at the same time")
+        end
+        repo = GitRepo(path)
+    elseif url !== nothing || rev !== nothing
+        repo = GitRepo(url=url, rev=rev)
+    else
+        repo = nothing
+    end
+
+    version = VersionSpec(version)
+    uuid isa String && (uuid = UUID(uuid))
+    PackageSpec(name, uuid, version, PKGMODE_PROJECT, nothing, PKGSPEC_NOTHING, repo)
+end
+
 has_name(pkg::PackageSpec) = !isempty(pkg.name)
 has_uuid(pkg::PackageSpec) = pkg.uuid != UUID(zero(UInt128))
 
 function Base.show(io::IO, pkg::PackageSpec)
-    print(io, "PackageSpec(")
-    has_name(pkg) && show(io, pkg.name)
-    has_name(pkg) && has_uuid(pkg) && print(io, ", ")
-    has_uuid(pkg) && show(io, pkg.uuid)
     vstr = repr(pkg.version)
-    if vstr != "VersionSpec(\"*\")"
-        (has_name(pkg) || has_uuid(pkg)) && print(io, ", ")
-        print(io, vstr)
+    f = ["name" => pkg.name, "uuid" => has_uuid(pkg) ? pkg.uuid : "", "v" => (vstr == "VersionSpec(\"*\")" ? "" : vstr)]
+    if pkg.repo !== nothing
+        if !isempty(pkg.repo.url)
+            push!(f, "url/path" => pkg.repo.url)
+        end
+        if !isempty(pkg.repo.rev)
+            push!(f, "rev" => pkg.repo.rev)
+        end
+    end
+    print(io, "PackageSpec(")
+    first = true
+    for (field, value) in f
+        value == "" && continue
+        first || print(io, ", ")
+        print(io, field, "=", value)
+        first = false
     end
     print(io, ")")
 end

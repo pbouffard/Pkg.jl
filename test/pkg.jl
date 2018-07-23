@@ -75,7 +75,6 @@ import Pkg.Types: semver_spec, VersionSpec
 
     @test semver_spec("≥1.3.0") == semver_spec(">=1.3.0")
 
-
     @test semver_spec(">=   1.2.3") == VersionSpec("1.2.3-*")
     @test semver_spec(">=1.2  ") == VersionSpec("1.2.0-*")
     @test semver_spec("  >=  1") == VersionSpec("1.0.0-*")
@@ -180,7 +179,7 @@ temp_pkg_dir() do project_path
         Pkg.rm(TEST_PKG.name)
         mktempdir() do devdir
             withenv("JULIA_PKG_DEVDIR" => devdir) do
-                Pkg.REPLMode.pkgstr("develop $(TEST_PKG.name)")
+                Pkg.develop(TEST_PKG.name)
                 @test isinstalled(TEST_PKG)
                 @test Pkg.installed()[TEST_PKG.name] > old_v
                 test_pkg_main_file = joinpath(devdir, TEST_PKG.name, "src", TEST_PKG.name * ".jl")
@@ -213,6 +212,10 @@ temp_pkg_dir() do project_path
         end
     end
 
+    @testset "invalid pkg name"
+        @test_throws CommandError Pkg.add(",sa..,--")
+    end
+
     @testset "stdlibs as direct dependency" begin
         uuid_pkg = (name = "CRC32c", uuid = UUID("8bf52ea8-c179-5cab-976a-9e18b702a9bc"))
         Pkg.add("CRC32c")
@@ -224,7 +227,7 @@ temp_pkg_dir() do project_path
 
     @testset "package name in resolver errors" begin
         try
-            Pkg.add([PackageSpec(TEST_PKG.name, VersionSpec(v"55"))])
+            Pkg.add(PackageSpec(;name = TEST_PKG.name, version = v"55"))
         catch e
             @test occursin(TEST_PKG.name, sprint(showerror, e))
         end
@@ -235,10 +238,9 @@ temp_pkg_dir() do project_path
             withenv("JULIA_PKG_DEVDIR" => devdir) do
                 try
                     Pkg.setprotocol!("notarealprotocol")
-                    # Pkg.develop is broken, update to use when fixed
-                    @test_throws CommandError pkg"develop Example"
+                    @test_throws CommandError Pkg.develop("Example")
                     Pkg.setprotocol!()
-                    pkg"develop Example"
+                    Pkg.develop("Example")
                     @test isinstalled(TEST_PKG)
                 finally
                     Pkg.setprotocol!()
